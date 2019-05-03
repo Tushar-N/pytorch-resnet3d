@@ -1,15 +1,15 @@
 # 3D ConvNets in Pytorch
 
-Do you want 72% top-1 accuracy on a large video dataset? Are you tired of Kinetics videos disappearing from YouTube every day? Do you have recurring nightmares about Caffe2? Then this is the repo for you!
+Do you want >70% top-1 accuracy on a large video dataset? Are you tired of Kinetics videos disappearing from YouTube every day? Do you have recurring nightmares about Caffe2? Then this is the repo for you!
 
 This is a PyTorch implementation of the Caffe2 I3D ResNet baseline from the [video-nonlocal-net](https://github.com/facebookresearch/video-nonlocal-net) repo. The weights are directly ported from the caffe2 model (See [checkpoints](https://github.com/facebookresearch/video-nonlocal-net#main-results)). This should be a good starting point to extract features, finetune on another dataset etc. without the hassle of dealing with Caffe2, and with all the benefits of a very carefully trained Kinetics model. 
 
 It's only a matter of time before FAIR releases a good PyTorch version of their non-local-net codebase, but until then, at least you have this ¯\\\_(ツ)\_/¯
 
 **Amazing features**: 
-&#8291;- Only a single model (ResNet50-I3D). Parameters hardcoded with love. 
-&#8291;- Only the evaluation script for Kinetics (training from scratch or ftuning has not been tested yet.)
-&#8291;- No non-local versions yet. 
+&#8291;- Only a single model (ResNet50-I3D). Parameters hardcoded with love.  
+&#8291;- Only the evaluation script for Kinetics (training from scratch or ftuning has not been tested yet.)  
+&#8291;- No non-local versions yet.   
 
 
 ## Kinetics Evaluation

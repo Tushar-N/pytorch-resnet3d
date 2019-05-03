@@ -6,7 +6,7 @@ This is a PyTorch implementation of the Caffe2 I3D ResNet baseline from the [vid
 
 It's only a matter of time before FAIR releases a good PyTorch version of their non-local-net codebase, but until then, at least you have this ¯\\\_(ツ)\_/¯
 
-**Amazing features**: 
+**Amazing features**:  
 &#8291;- Only a single model (ResNet50-I3D). Parameters hardcoded with love.  
 &#8291;- Only the evaluation script for Kinetics (training from scratch or ftuning has not been tested yet.)  
 &#8291;- No non-local versions yet.   
@@ -16,7 +16,7 @@ It's only a matter of time before FAIR releases a good PyTorch version of their 
 
 The code has been tested with Python 3.7 + PyTorch 1.0.
 
-**Pretrained Weights**
+**Pretrained Weights**  
 Download pretrained weights for `run_i3d_baseline_400k_32f` using:
 ```bash
 bash pretrained/download_weights.sh
@@ -32,7 +32,7 @@ from models import resnet
 net = resnet.i3_res50()
 ```
 
-**Data** 
+**Data**   
 Download videos using the [official crawler](https://github.com/activitynet/ActivityNet/tree/master/Crawler/Kinetics) and extract frames. [This repo](https://github.com/kenshohara/3D-ResNets-PyTorch/#kinetics) has a script to do this.
 
 create softlinks for frames and annotations
@@ -42,7 +42,7 @@ ln -s /path/to/kinetics/frames data/kinetics/frames/
 ln -s /path/to/kinetics/annotation_csvs data/kinetics/annotations/
 ```
 
-**Evaluate**
+**Evaluate**  
 Run the evaluation script to generate scores on the validation set. 
 ```bash
 # Evaluation using 3 random spatial crops per frame + 10 uniformly sampled clips per video
@@ -57,4 +57,4 @@ python eval.py --batch_size 8 --mode clip
 python eval.py --batch_size 64 --mode clip --parallel
 ```
 
-You should get around 72.2% top-1 accuracy for the video (3 random spatial crops per frame + 10 uniformly sampled clips per video) and around 64.7% top-1 accuracy for the clip (single, center crop and a single, centered clip). Note that these numbers are on whatever is left of the Kinetics val set these days (~18434 videos).
+You should get around **72.2%** top-1 accuracy for the video (3 random spatial crops per frame + 10 uniformly sampled clips per video) and around **64.7%** top-1 accuracy for the clip (single, center crop and a single, centered clip). Note that these numbers are on whatever is left of the Kinetics val set these days (~18434 videos).

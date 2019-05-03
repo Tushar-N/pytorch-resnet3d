@@ -33,9 +33,7 @@ net = resnet.i3_res50()
 ```
 
 **Data**   
-Download videos using the [official crawler](https://github.com/activitynet/ActivityNet/tree/master/Crawler/Kinetics) and extract frames. [This repo](https://github.com/kenshohara/3D-ResNets-PyTorch/#kinetics) has a script to do this.
-
-create softlinks for frames and annotations
+Download videos using the [official crawler](https://github.com/activitynet/ActivityNet/tree/master/Crawler/Kinetics) and extract frames. [This repo](https://github.com/kenshohara/3D-ResNets-PyTorch/#kinetics) has a script to do this. Then create softlinks for frames and annotations:
 ```bash
 mkdir -p data/kinetics/frames/ data/kinetics/annotations/
 ln -s /path/to/kinetics/frames data/kinetics/frames/

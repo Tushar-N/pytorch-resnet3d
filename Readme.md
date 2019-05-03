@@ -4,12 +4,12 @@ Do you want >70% top-1 accuracy on a large video dataset? Are you tired of Kinet
 
 This is a PyTorch implementation of the Caffe2 I3D ResNet baseline from the [video-nonlocal-net](https://github.com/facebookresearch/video-nonlocal-net) repo. The weights are directly ported from the caffe2 model (See [checkpoints](https://github.com/facebookresearch/video-nonlocal-net#main-results)). This should be a good starting point to extract features, finetune on another dataset etc. without the hassle of dealing with Caffe2, and with all the benefits of a very carefully trained Kinetics model. 
 
-It's only a matter of time before FAIR releases a good PyTorch version of their non-local-net codebase, but until then, at least you have this ¯\\\_(ツ)\_/¯
+It's only a matter of time before FAIR releases a good PyTorch version of their nonlocal-net codebase, but until then, at least you have this ¯\\\_(ツ)\_/¯
 
 **Amazing features**:  
 &#8291;- Only a single model (ResNet50-I3D). Parameters hardcoded with love.  
 &#8291;- Only the evaluation script for Kinetics (training from scratch or ftuning has not been tested yet.)  
-&#8291;- No non-local versions yet.   
+&#8291;- No nonlocal versions yet.   
 
 
 ## Kinetics Evaluation
@@ -17,9 +17,9 @@ It's only a matter of time before FAIR releases a good PyTorch version of their 
 The code has been tested with Python 3.7 + PyTorch 1.0.
 
 **Pretrained Weights**  
-Download pretrained weights for `run_i3d_baseline_400k_32f` using:
+Download pretrained weights for `run_i3d_baseline_400k_32f` from the nonlocal repo
 ```bash
-bash pretrained/download_weights.sh
+wget https://dl.fbaipublicfiles.com/video-nonlocal/i3d_baseline_32x2_IN_pretrain_400k.pkl -P pretrained/
 ```
 Convert these weights from caffe2 to pytorch. This is just a simple renaming of the blobs to match the pytorch model.
 ```bash

@@ -13,10 +13,10 @@ class FrozenBN(nn.Module):
         self.params_set = False
 
     def set_params(self, scale, bias, running_mean, running_var):
-        self.scale = scale.cuda()
-        self.bias = bias.cuda()
-        self.running_mean = running_mean.cuda()
-        self.running_var = running_var.cuda()
+        self.register_buffer('scale', scale)
+        self.register_buffer('bias', bias)
+        self.register_buffer('running_mean', running_mean)
+        self.register_buffer('running_var', running_var)
         self.params_set = True
 
     def forward(self, x):

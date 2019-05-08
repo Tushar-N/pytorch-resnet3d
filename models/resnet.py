@@ -93,6 +93,7 @@ class I3Res50(nn.Module):
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, temp_conv=[0, 1, 0], temp_stride=[1, 1, 1])
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
+        self.drop = nn.Dropout(0.5)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -130,6 +131,7 @@ class I3Res50(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
+        x = self.drop(x)
 
         x = x.view(x.shape[0], -1)
         x = self.fc(x)

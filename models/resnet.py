@@ -41,7 +41,7 @@ def freeze_bn(m, name):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride, downsample, temp_conv, temp_stride):
+    def __init__(self, inplanes, planes, stride, downsample, temp_conv, temp_stride, use_nl=False):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv3d(inplanes, planes, kernel_size=(1 + temp_conv * 2, 1, 1), stride=(temp_stride, 1, 1), padding=(temp_conv, 0, 0), bias=False)
         self.bn1 = nn.BatchNorm3d(planes)
@@ -52,6 +52,10 @@ class Bottleneck(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
+
+        outplanes = planes * 4
+        self.nl = NonLocalBlock(outplanes, outplanes, outplanes//2) if use_nl else None
+
 
     def forward(self, x):
         residual = x
@@ -73,13 +77,58 @@ class Bottleneck(nn.Module):
         out += residual
         out = self.relu(out)
 
+        if self.nl is not None:
+            out = self.nl(out)
+
         return out
+
+class NonLocalBlock(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_inner):
+        super(NonLocalBlock, self).__init__()
+
+        self.dim_in = dim_in
+        self.dim_inner = dim_inner  
+        self.dim_out = dim_out
+
+        self.theta = nn.Conv3d(dim_in, dim_inner, kernel_size=(1,1,1), stride=(1,1,1), padding=(0,0,0))
+        self.maxpool = nn.MaxPool3d(kernel_size=(1,2,2), stride=(1,2,2), padding=(0,0,0))
+        self.phi = nn.Conv3d(dim_in, dim_inner, kernel_size=(1,1,1), stride=(1,1,1), padding=(0,0,0))
+        self.g = nn.Conv3d(dim_in, dim_inner, kernel_size=(1,1,1), stride=(1,1,1), padding=(0,0,0))
+
+        self.out = nn.Conv3d(dim_inner, dim_out, kernel_size=(1,1,1), stride=(1,1,1), padding=(0,0,0))
+        self.bn = nn.BatchNorm3d(dim_out)
+
+    def forward(self, x):
+        residual = x
+
+        batch_size = x.shape[0]
+        mp = self.maxpool(x)
+        theta = self.theta(x)
+        phi = self.phi(mp)
+        g = self.g(mp)
+
+        theta_shape_5d = theta.shape
+        theta, phi, g = theta.view(batch_size, self.dim_inner, -1), phi.view(batch_size, self.dim_inner, -1), g.view(batch_size, self.dim_inner, -1)
+      
+        theta_phi = torch.bmm(theta.transpose(1, 2), phi) # (8, 1024, 784) * (8, 1024, 784) => (8, 784, 784)
+        theta_phi_sc = theta_phi * (self.dim_inner**-.5)
+        p = F.softmax(theta_phi_sc, dim=-1)
+
+        t = torch.bmm(g, p.transpose(1, 2))
+        t = t.view(theta_shape_5d)
+
+        out = self.out(t)
+        out = self.bn(out)
+
+        out = out + residual
+        return out
+
 
 #-----------------------------------------------------------------------------------------------#
 
 class I3Res50(nn.Module):
 
-    def __init__(self, block=Bottleneck, layers=[3, 4, 6, 3], num_classes=400):
+    def __init__(self, block=Bottleneck, layers=[3, 4, 6, 3], num_classes=400, use_nl=False):
         self.inplanes = 64
         super(I3Res50, self).__init__()
         self.conv1 = nn.Conv3d(3, 64, kernel_size=(5, 7, 7), stride=(2, 2, 2), padding=(2, 3, 3), bias=False)
@@ -87,9 +136,11 @@ class I3Res50(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool1 = nn.MaxPool3d(kernel_size=(2, 3, 3), stride=(2, 2, 2), padding=(0, 0, 0))
         self.maxpool2 = nn.MaxPool3d(kernel_size=(2, 1, 1), stride=(2, 1, 1), padding=(0, 0, 0))
+
+        nonlocal_mod = 2 if use_nl else 1000
         self.layer1 = self._make_layer(block, 64, layers[0], stride=1, temp_conv=[1, 1, 1], temp_stride=[1, 1, 1])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, temp_conv=[1, 0, 1, 0], temp_stride=[1, 1, 1, 1])
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, temp_conv=[1, 0, 1, 0, 1, 0], temp_stride=[1, 1, 1, 1, 1, 1])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, temp_conv=[1, 0, 1, 0], temp_stride=[1, 1, 1, 1], nonlocal_mod=nonlocal_mod)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, temp_conv=[1, 0, 1, 0, 1, 0], temp_stride=[1, 1, 1, 1, 1, 1], nonlocal_mod=nonlocal_mod)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2, temp_conv=[0, 1, 0], temp_stride=[1, 1, 1])
         self.avgpool = nn.AdaptiveAvgPool3d((1, 1, 1))
         self.fc = nn.Linear(512 * block.expansion, num_classes)
@@ -102,7 +153,7 @@ class I3Res50(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, blocks, stride, temp_conv, temp_stride):
+    def _make_layer(self, block, planes, blocks, stride, temp_conv, temp_stride, nonlocal_mod=1000):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion or temp_stride[0]!=1:
             downsample = nn.Sequential(
@@ -111,10 +162,10 @@ class I3Res50(nn.Module):
                 )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, temp_conv[0], temp_stride[0]))
+        layers.append(block(self.inplanes, planes, stride, downsample, temp_conv[0], temp_stride[0], False))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, 1, None, temp_conv[i], temp_stride[i]))
+            layers.append(block(self.inplanes, planes, 1, None, temp_conv[i], temp_stride[i], i%nonlocal_mod==nonlocal_mod-1))
 
         return nn.Sequential(*layers)
 
@@ -163,22 +214,27 @@ class I3Res50(nn.Module):
         loss_dict = {}
         if 'label' in batch:
             loss = F.cross_entropy(pred, batch['label'], reduction='none')
-            loss_dict = {'clf': loss}
+            loss_dict = {'loss': loss}
             
         return pred, loss_dict
 
 #-----------------------------------------------------------------------------------------------#
 
 def i3_res50(num_classes):
-    net = I3Res50(num_classes=num_classes)
+    net = I3Res50(num_classes=num_classes, use_nl=False)
     state_dict = torch.load('pretrained/i3d_r50_kinetics.pth')
     net.load_state_dict(state_dict)
-
-    # Only needed for finetuning. For validation, .eval() works.
-    # freeze_bn(net, "net") 
-
+    # freeze_bn(net, "net") # Only needed for finetuning. For validation, .eval() works.
     return net
 
+def i3_res50_nl(num_classes):
+    net = I3Res50(num_classes=num_classes, use_nl=True)
+    state_dict = torch.load('pretrained/i3d_r50_nl_kinetics.pth')
+    net.load_state_dict(state_dict)
+    # freeze_bn(net, "net") # Only needed for finetuning. For validation, .eval() works.
+    return net
 
 if __name__=='__main__':
-    net = i3_res50(400)
+    net = i3_res50_nl(400)
+    inp = {'frames': torch.rand(4, 3, 32, 224, 224)}
+    pred, losses = net(inp)

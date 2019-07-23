@@ -4,6 +4,11 @@ import numpy as np
 import pickle
 import torch
 
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', default='r50_nl', help='r50|r50_nl')
+args = parser.parse_args()
+
 #-----------------------------------------------------------------------------------------------#
 
 # Generate a random input. Normalize for fun.
@@ -29,13 +34,18 @@ c2_net.net.Proto().type = 'dag'
 workspace.CreateBlob('data')
 workspace.CreateBlob('labels')
 
-c2_net, out_blob = resnet_video_org.create_model(model=c2_net, data='data', labels='labels', split='val',)
+c2_net, out_blob = resnet_video_org.create_model(model=c2_net, data='data', labels='labels', split='val', use_nl=args.model=='r50_nl')
 
 workspace.RunNetOnce(c2_net.param_init_net)
 workspace.CreateNet(c2_net.net)
 
 # load pretrained weights
-wts = pickle.load(open('pretrained/i3d_baseline_32x2_IN_pretrain_400k.pkl', 'rb'), encoding='latin')['blobs']
+if args.model=='r50':
+    wt_file = 'pretrained/i3d_baseline_32x2_IN_pretrain_400k.pkl'
+elif args.model=='r50_nl':
+    wt_file = 'pretrained/i3d_nonlocal_32x2_IN_pretrain_400k.pkl'
+wts = pickle.load(open(wt_file, 'rb'), encoding='latin')['blobs']
+
 for key in wts:
     if type(wts[key]) == np.ndarray:
         workspace.FeedBlob(key, wts[key])
@@ -50,7 +60,16 @@ torch.backends.cudnn.enabled = False
 from models import resnet
 
 data = torch.from_numpy(data).cuda()
-pth_net = resnet.i3_res50(num_classes=400).cuda().eval()
+
+# load pretrained weights
+if args.model=='r50':
+    pth_net = resnet.i3_res50(num_classes=400)
+    key_map = torch.load('pretrained/i3d_r50_kinetics.pth.keymap')
+elif args.model=='r50_nl':
+    pth_net = resnet.i3_res50_nl(num_classes=400)
+    key_map = torch.load('pretrained/i3d_r50_nl_kinetics.pth.keymap')
+key_map = {'.'.join(k.split('.')[:-1]): '_'.join(v.split('_')[:-1]) for k, v in key_map.items()}
+pth_net.cuda().eval()
     
 def hook(module, input, output):
     setattr(module, "_value_hook", output)
@@ -69,9 +88,6 @@ for name, module in pth_net.named_modules():
     except:
         pass
 
-key_map = torch.load('pretrained/key_map.pth')
-key_map = {'.'.join(k.split('.')[:-1]): '_'.join(v.split('_')[:-1]) for k, v in key_map.items()}
-
 for key in sorted(key_map):
 
     pth_v = pth_blobs[key]
@@ -81,4 +97,3 @@ for key in sorted(key_map):
     # Most of these are <1e-6
     delta = np.abs(pth_v-c2_v)
     print (key, np.max(delta), np.min(delta), np.mean(delta))
-

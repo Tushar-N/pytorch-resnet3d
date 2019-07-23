@@ -12,13 +12,14 @@ parser.add_argument('--batch_size', default=8, type=int, help='Batch size for tr
 parser.add_argument('--parallel', action ='store_true', default=False)
 parser.add_argument('--workers', type=int, default=4)
 parser.add_argument('--mode', default='video', help='video|clip')
+parser.add_argument('--model', default='r50_nl', help='r50|r50_nl')
 args = parser.parse_args()
 
 def test():
 
     net.eval()
 
-    correct, total = 0, 0
+    topk = [1, 5]
     loss_meters = collections.defaultdict(lambda: tnt.meter.AverageValueMeter())
     for idx, batch in enumerate(testloader):
 
@@ -30,19 +31,15 @@ def test():
 
         for k, v in loss_dict.items():
             loss_meters[k].add(v.item())
-        loss_meters['total_loss'].add(loss.item())
 
-        _, pred_idx = pred.max(1)
-        correct += (pred_idx==batch['label']).float().sum()
-        total += pred.size(0)
+        prec_scores = util.accuracy(pred, batch['label'], topk=topk)
+        for k, prec in zip(topk, prec_scores):
+            loss_meters['P%s'%k].add(prec.item(), pred.shape[0])
 
-        print ('%d/%d.. L: %.3f A: %.3f'%(idx, len(testloader), loss_meters['total_loss'].value()[0], correct/total))
+        stats = ' | '.join(['%s: %.3f'%(k, v.value()[0]) for k,v in loss_meters.items()])
+        print ('%d/%d.. %s'%(idx, len(testloader), stats))
 
-    accuracy = 1.0*correct/total
-    log_str = '(test) A: %.3f | '%(accuracy)
-    log_str += ' | '.join(['%s: %.3f'%(k, v.value()[0]) for k,v in loss_meters.items()])
-    print (log_str)
-
+    print ('(test) %s'%stats)
 
 #----------------------------------------------------------------------------------------------------------------------------------------#
 from data import kinetics
@@ -53,9 +50,12 @@ if args.mode == 'video':
 elif args.mode == 'clip':
     testset = kinetics.Kinetics(root='data/kinetics/', split='val', clip_len=32)
 
-testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=8)
+testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers)
 
-net = resnet.i3_res50(num_classes=len(testset.labels))
+if args.model=='r50':
+    net = resnet.i3_res50(num_classes=len(testset.labels))
+elif args.model=='r50_nl':
+    net = resnet.i3_res50_nl(num_classes=len(testset.labels))
 net.cuda()
 
 if args.parallel:

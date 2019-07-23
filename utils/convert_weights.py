@@ -6,12 +6,13 @@ import sys
 c2_weights = sys.argv[1] # 'pretrained/i3d_baseline_32x2_IN_pretrain_400k.pkl'
 pth_weights_out = sys.argv[2] # 'pretrained/i3d_r50_kinetics.pth'
 
-
 c2 = pickle.load(open(c2_weights, 'rb'), encoding='latin')['blobs']
 c2 = {k:v for k,v in c2.items() if 'momentum' not in k}
 
 downsample_pat = re.compile('res(.)_(.)_branch1_.*')
 conv_pat = re.compile('res(.)_(.)_branch2(.)_.*')
+nl_pat = re.compile('nonlocal_conv(.)_(.)_(.*)_.*')
+
 m2num = dict(zip('abc',[1,2,3]))
 suffix_dict = {'b':'bias', 'w':'weight', 's':'weight', 'rm':'running_mean', 'riv':'running_var'}
 
@@ -46,14 +47,22 @@ for key in c2:
 		new_key = 'layer%d.%d.%s.%d.%s'%(layer-1, block, name, module, suffix)
 		key_map[new_key] = key
 
-torch.save(key_map, 'pretrained/key_map.pth')
+	nl_match = nl_pat.match(key)
+	if nl_match:
+		layer, block, module = nl_match.groups()
+		layer, block = int(layer), int(block)
+		name = 'nl.%s'%module
+		suffix = suffix_dict[key.split('_')[-1]]
+		new_key = 'layer%d.%d.%s.%s'%(layer-1, block, name, suffix)
+		key_map[new_key] = key
 
 from models import resnet
-pth = resnet.I3Res50(num_classes=400)
+pth = resnet.I3Res50(num_classes=400, use_nl=True)
 state_dict = pth.state_dict()
 
 new_state_dict = {key: torch.from_numpy(c2[key_map[key]]) for key in state_dict if key in key_map}
 torch.save(new_state_dict, pth_weights_out)
+torch.save(key_map, pth_weights_out+'.keymap')
 
 # check if weight dimensions match
 for key in state_dict:

@@ -1,7 +1,8 @@
 import models.resnet_helper as resnet_helper
 import numpy as np
 
-def create_model(model, data, labels, split):
+
+def create_model(model, data, labels, split, use_nl):
     group = 1
     width_per_group = 64
     batch_size = 8
@@ -9,7 +10,7 @@ def create_model(model, data, labels, split):
     (n1, n2, n3, n4) = (3, 4, 6, 3)
 
     res_block = resnet_helper._generic_residual_block_3d
-    dim_inner = 1 * 64
+    dim_inner = group * width_per_group
 
     use_temp_convs_set = [[2], [1, 1, 1], [1, 0, 1, 0], [1, 0, 1, 0, 1, 0], [0, 1, 0]]
     temp_strides_set = [[2], [1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1, 1, 1], [1, 1, 1]]
@@ -32,6 +33,8 @@ def create_model(model, data, labels, split):
 
     # ---------------- #
 
+    nonlocal_mod = 2 if use_nl else 1000
+
     blob_in, dim_in = resnet_helper.res_stage_nonlocal(
         model, res_block, max_pool, 64, 256, stride=1, num_blocks=3,
         prefix='res2', dim_inner=64, group=1,
@@ -43,13 +46,13 @@ def create_model(model, data, labels, split):
         model, res_block, blob_in, dim_in, 512, stride=2, num_blocks=4,
         prefix='res3', dim_inner=64 * 2, group=1,
         use_temp_convs=[1, 0, 1, 0], temp_strides=[1, 1, 1, 1],
-        batch_size=batch_size, nonlocal_name='nonlocal_conv3', nonlocal_mod=1000)
+        batch_size=batch_size, nonlocal_name='nonlocal_conv3', nonlocal_mod=nonlocal_mod)
 
     blob_in, dim_in = resnet_helper.res_stage_nonlocal(
         model, res_block, blob_in, dim_in, 1024, stride=2, num_blocks=6,
         prefix='res4', dim_inner=64 * 4, group=1,
         use_temp_convs=[1, 0, 1, 0, 1, 0], temp_strides=[1, 1, 1, 1, 1, 1],
-        batch_size=batch_size, nonlocal_name='nonlocal_conv4', nonlocal_mod=1000)
+        batch_size=batch_size, nonlocal_name='nonlocal_conv4', nonlocal_mod=nonlocal_mod)
 
     blob_in, dim_in = resnet_helper.res_stage_nonlocal(
         model, res_block, blob_in, dim_in, 2048, stride=2, num_blocks=3,
@@ -76,7 +79,3 @@ def create_model(model, data, labels, split):
         )
 
     return model, blob_out
-
-
-if __name__ == '__main__':
-    pass

@@ -1,0 +1,7 @@
+*.*~
+*.pyc
+*.pth
+
+__pycache__/
+pretrained/
+data/kinetics/

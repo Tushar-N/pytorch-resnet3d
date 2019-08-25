@@ -6,7 +6,7 @@ This is a PyTorch implementation of the Caffe2 I3D ResNet Nonlocal model from th
 
 It's only a matter of time before FAIR releases a good PyTorch version of their nonlocal-net codebase, but until then, at least you have this ¯\\\_(ツ)\_/¯
 
-**Amazing features**:
+**Amazing features**:  
 &#8291;- Only a single model (ResNet50-I3D). Parameters hardcoded with love.  
 &#8291;- Only the evaluation script for Kinetics (training from scratch or ftuning has not been tested yet.)  
 &#8291;- ~~No nonlocal versions yet.~~ One exciting NL version to choose from.
